@@ -2,6 +2,7 @@ name = "tpil25"
 version = "0.1.0"
 keywords = ["math"]
 defaultTargets = ["TPIL25"]
+reservoir = false
 
 [leanOptions]
 autoImplicit = false

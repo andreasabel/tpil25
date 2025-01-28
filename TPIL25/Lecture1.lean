@@ -108,6 +108,9 @@ def b2 : Bool := false
 
 /- Check their types. -/
 
+#check Nat
+#check ℕ
+
 #check m            -- output: Nat
 #check n
 #check n + 0        -- Nat
@@ -116,6 +119,8 @@ def b2 : Bool := false
 #check b1 && b2     -- "&&" is the Boolean and
 #check b1 || b2     -- Boolean or
 #check true         -- Boolean "true"
+
+example : Nat := 1
 
 example := m
 example : Nat := m
@@ -142,15 +147,19 @@ example : Nat := m
 #check Nat × Nat → Nat
 #check (Nat → Nat) → Nat -- a "functional"
 
-#check Nat.succ     -- Nat → Nat
+#check (Nat.succ)   -- Nat → Nat
 #check (0, 1)       -- Nat × Nat
 #check Nat.add      -- Nat → Nat → Nat
 
-#check Nat.succ 2   -- Nat
-#check Nat.add 3    -- Nat → Nat
-#check Nat.add 5 2  -- Nat
-#check (5, 9).1     -- Nat
-#check (5, 9).2     -- Nat
+#check Nat.succ 2    -- Nat
+#check Nat.add 3     -- Nat → Nat
+#check Nat.add 5 2   -- Nat
+#check (5, 9).1      -- Nat
+#check (5, 9).2      -- Nat
+#check (5, 9, 5).1   -- Nat
+#check (5, 9, 5).2.1 -- Nat
+#check (5, 9, 5).2.2 -- Nat
+-- #check (5, 9, 5).3 -- error
 
 #eval Nat.succ 2   -- 3
 #eval Nat.add 5 2  -- 7
@@ -163,6 +172,8 @@ example : Nat := m
 
 #eval 2 + 2
 #eval 2343242 * 4435
+#check (17 / 5 : ℕ) + 5
+#check (17 / 5 : ℕ) + (5 : ℚ)
 #eval (17 : ℚ) / 5 + 5
 #eval 17 % 5
 
@@ -192,6 +203,9 @@ def G : Type → Type → Type := Prod
 #check G A B    -- Type
 #check G A Nat  -- Type
 
+-- #eval G A Nat
+#reduce G A Nat
+
 
 -- # The type of types
 #check Type     -- Type 1
@@ -207,12 +221,16 @@ def G : Type → Type → Type := Prod
 | term   | trivial       | true          | fun n => Fin n  | fun (_ : Type) => Type | ... |
 -/
 
+#check Nat -> Type
+#check fun n => Fin n
 
 -- # Universe parametricity
 #check List     -- List.{u} (α : Type u) : Type u
 #check List.{0} -- List : Type → Type
+#check List.{1} -- List : Type 1 → Type 1
 
 #check Prod    -- Prod.{u, v} (α : Type u) (β : Type v) : Type (max u v)
+#check Prod.{0, _} -- Prod : Type → Type u_1 → Type u_1
 
 
 -- # Function abstraction and evaluation
@@ -222,10 +240,12 @@ def G : Type → Type → Type := Prod
 #check λ x => x + 5       -- Nat inferred
 
 #eval (λ x : Nat => x + 5) 10    -- 15
+#eval (fun (x, y) => x + y : Nat × Nat → Nat) (10, 5)    -- 15
 
 
 -- # Types as parameters
-#check fun (α β γ : Type) (g : β → γ) (f : α → β) (x : α) => g (f x)
+#check -- fun α β γ g f x => g (f x) : (α β γ : Type) → (β → γ) → (α → β) → α → γ
+  fun (α β γ : Type) (g : β → γ) (f : α → β) (x : α) => g (f x)
 
 
 -- # Propositions as types
@@ -234,8 +254,8 @@ def G : Type → Type → Type := Prod
 #check 2 + 2 = 4
 #check 2 + 2 = 5
 
-#check ∀ x y z n : ℕ, x * y * z ≠ 0 → n > 2 →
-  x^n + y^n ≠ z^n
+#check -- ∀ (x y z n : ℕ), x * y * z ≠ 0 → n > 2 → x ^ n + y ^ n ≠ z ^ n : Prop
+  ∀ x y z n : ℕ, x * y * z ≠ 0 → n > 2 → x^n + y^n ≠ z^n
 
 #check trivial
 #check (rfl : 2 + 2 = 4)
@@ -261,7 +281,14 @@ def double' : Nat → Nat :=
 def double'' :=
   fun (x : Nat) => x + x
 
-#eval double 3   -- 6
+#check double   -- double (x : ℕ) : ℕ
+#check double'  -- double' : ℕ → ℕ
+#check double'' -- double'' (x : ℕ) : ℕ
+
+example : double = double' := rfl
+example : double = double'' := rfl
+
+#eval double 3
 
 
 def add (x y : Nat) :=
@@ -300,6 +327,7 @@ def compose (α β γ : Type) (g : β → γ) (f : α → β) (x : α) : γ :=
 
 example := let a := Nat; fun x : a => Nat.succ x  -- ok
 -- example := (fun a => fun x : a => Nat.succ x) Nat -- fail
+-- example := have a := Nat; fun x : a => Nat.succ x  -- fail
 
 -- # variable declarations
 
@@ -320,13 +348,16 @@ end
 
 -- # Auto-implicits
 section
-set_option autoImplicit true
+  set_option autoImplicit true
 
-def identity : α → α :=
-  fun x => x
+  def identity : α → α :=
+    fun x => x
 
-example (h : nat → nat) (x : nat) : nat :=
-  h (h x)
+  example (h : Nat → Nat) (x : Nat) : Nat :=
+    h (h x)
+
+  example (h : nat → nat) (x : nat) : nat :=
+    h (h x)
 
 end
 
@@ -359,6 +390,7 @@ namespace Foo
   #check fa
   #check ffa
   #check Foo.fa
+  #check _root_.Foo.fa
 end Foo
 
 -- #check a  -- error
@@ -369,8 +401,9 @@ end Foo
 #check Foo.ffa
 
 open Foo
+def a := 2
 
-#check a
+#check _root_.a
 #check f
 #check fa
 #check Foo.fa
@@ -427,3 +460,12 @@ def Lst.nil' {α : Type u} : Lst α := List.nil
 #check @Lst.cons' _ 0 (@Lst.nil' _)
 #check @Lst.cons' Nat 0 (@Lst.nil' Nat)
 #check Lst.cons' (α := Nat) 0 (Lst.nil' (α := Nat))
+
+def foo {x : Nat} (h : x = 1) : Unit := ()
+
+#check @foo (0 + 1) rfl
+#check foo (x := 0 + 1) rfl
+
+
+-- #check fun n => (rfl : n + 1 = 1 + n)
+#check fun n => (rfl : 37 + 1 = 1 + 37)

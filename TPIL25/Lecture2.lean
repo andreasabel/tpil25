@@ -38,7 +38,7 @@ theorem bar' : True := trivial
 -- # Hole filling
 
 example : (True → True) ∧ (False → True) :=
-  sorry
+  ⟨fun h : True => h, fun _ => trivial⟩
 
 example : (True → True) ∧ (False → True) :=
   ⟨fun h => h, fun _h => trivial⟩
@@ -62,7 +62,7 @@ example (a : ℕ) (h1 : ∀ x, P x → Q x)
     (h2 : ∀ x, Q x → R x)
     (h3 : P a) :
     R a := by
-  refine h2 _ ?_
+  refine h2 a ?_
   refine h1 _ ?_
   refine h3
 
@@ -172,7 +172,7 @@ example : (True → True) ∧ (False → True) := by?
     exact trivial
 
 example (p q r : Prop) : p ∧ (q ∨ r) ↔ (p ∧ q) ∨ (p ∧ r) := by
-  apply Iff.intro
+  constructor
   · intro h
     apply Or.elim (And.right h)
     · intro hq
@@ -281,9 +281,19 @@ example (p q r : Prop) (hp : p) (hq : q) (hr : r) : p ∧ q ∧ r := by
 
 example (p q r : Prop) (hp : p) (hq : q) (hr : r) :
       p ∧ ((p ∧ q) ∧ r) ∧ (q ∧ r ∧ p) := by
-  repeat (any_goals constructor)
+  repeat any_goals constructor
   all_goals assumption
 
+example (f : ℕ → ℕ) (x : ℕ) : f x = f x := by
+  cases e : f x with
+  | zero => rfl
+  | succ n => rfl
+
+def double' (f : ℕ → ℕ) (x : ℕ) : ℕ := by
+  apply f
+  apply f
+  exact x
+#print double'
 
 -- # Rewriting
 
@@ -292,6 +302,9 @@ example (p q r : Prop) (hp : p) (hq : q) (hr : r) :
 example (f : Nat → Nat) (k : Nat) (h₁ : f 0 = 0) (h₂ : k = 0) : f k = 0 := by
   rw [h₂] -- replace k with 0
   rw [h₁] -- replace f 0 with 0
+
+example (f : Nat → Nat) (k : Nat) (h₁ : f 0 = 0) (h₂ : k = 0) : f k = 0 := by
+  rw [h₂, h₁]
 
 example (x y : Nat) (p : Nat → Prop) (q : Prop) (h : q → x = y)
         (h' : p y) (hq : q) : p x := by

@@ -53,8 +53,8 @@ example : True := by
 --   fail "oh no"
 
 example : True := by
-  try skip; trace_state
-  try fail "oh no"; trace_state
+  try (skip; trace_state)
+  try (fail "oh no"; trace_state)
   trace_state
   trivial
 
@@ -76,8 +76,8 @@ end
 -- # Inductive types
 
 inductive Trool
-  | true
-  | false
+  | protected true
+  | protected false
   | trelse
 
 inductive Trool' : Type
@@ -86,6 +86,8 @@ inductive Trool' : Type
   | trelse : Trool'
 
 
+#check Trool.true
+
 def toBool : Trool → Option Bool
   | Trool.true => some true
   | Trool.false => some false
@@ -93,19 +95,19 @@ def toBool : Trool → Option Bool
 
 namespace Trool
 
--- def toBool : Trool → Option Bool
---   | true => some true
---   | false => some false
---   | trelse => none
+def toBool : Trool → Option Bool
+  | .true => some true
+  | .false => some false
+  | trelse => none
 
 def toBool' : Trool → Option Bool
-  | true => some Bool.true
-  | false => some Bool.false
+  | .true => some Bool.true
+  | .false => some Bool.false
   | trelse => none
 
 def toBool'' : Trool → Option Bool
-  | true => some .true
-  | false => some .false
+  | .true => some .true
+  | .false => some .false
   | trelse => none
 
 -- protected true, false
@@ -149,7 +151,7 @@ def MyList.map {α β} (f : α → β) : MyList α → MyList β
 #print MyList.cons
 #print MyList.rec
 
--- noncomputable
+noncomputable
 section
 
 variable
@@ -170,14 +172,13 @@ example (a : α) (b : MyList α) :
   MyList.rec H0 H1 (.cons a b) =
   H1 a b (MyList.rec H0 H1 b) := rfl
 
-end
-
 def MyList.map' {α β} (f : α → β) : MyList α → MyList β :=
   fun list =>
     list.rec
-      _
-      _
+      nil
+      fun a _ IH => cons (f a) IH
 
+end
 
 -- ## Proofs by induction are also definitions by recursion
 
@@ -192,6 +193,16 @@ theorem length_map {α β} (f : α → β) (l : MyList α) :
   match l with
   | .nil => rfl
   | .cons _ l => congrArg Nat.succ (length_map f l)
+
+theorem length_map' {α β} (f : α → β) (l : MyList α) :
+    (map f l).length = l.length :=
+  match l with
+  | nil => by
+    simp [map]
+    rfl
+  | cons _ l => by
+    simp [map, length]
+    exact (length_map' f l)
 
 end MyList
 
@@ -242,9 +253,13 @@ example (n : ℕ) : foo n = n := by
 example (n : ℕ) : foo n = n := by
   induction n <;> simp [foo, *]
 
-theorem MyList.length_map' {α β} (f : α → β) (l : MyList α) :
+theorem MyList.length_map''' {α β} (f : α → β) (l : MyList α) :
     (map f l).length = l.length := by
   induction l <;> simp [map, length, *]
+
+example {p q} (h : p ∨ p) (h2 : q ∨ q) : 1 = 1 ∨ 0 = 0 := by
+  casesm* _ ∨ _
+  all_goals trivial
 
 -- ## match
 
@@ -324,25 +339,23 @@ example (n : ℕ) : IsEven n ↔ ∃ k, n = 2 * k := by
   constructor
   · intro H
     induction H with
-    | zero =>
-      exists 0
-    | add2 h _ IH =>
-      let ⟨k, eq⟩ := IH
+    | zero => exists 0
+    | add2 n _ ih =>
+      let ⟨k, eq⟩ := ih
       exists k+1
       rw [eq]
       ring
   · intro ⟨k, eq⟩
     rw [eq]
-    -- clear eq
+    clear eq
     induction k with
     | zero =>
       show IsEven 0
       constructor
-    | succ n ih =>
-      show IsEven (2*n + 2)
+    | succ k ih =>
+      rw [show 2*(k+1) = 2*k + 2 by ring]
       constructor
-      exact ih
-
+      apply ih
 
 #print Or
 #print Exists
@@ -362,13 +375,18 @@ inductive Point' where
   | mk
     (x : ℕ)
     (y : ℕ)
+    : Point'
 
 structure Point'' : Type where
-  mk ::
+  make ::
   x : ℕ
   y : ℕ
 
 example : Point := Point.mk 0 1
+
+-- structure Exists'.{u} {α : Sort u} (p : α → Prop) : Prop where
+--   w : α
+--   h : p w
 
 def toProd (p : Point) : ℕ × ℕ :=
   match p with
@@ -386,9 +404,10 @@ def Point'.y : Point → ℕ
 def pt : Point := { x := 0, y := 1 }
 def pt' : Point := ⟨0, 1⟩
 
-example : Point where
+def foo' : Point := {
   x := 0
   y := 1
+}
 
 structure Point3 extends Point where
   z : ℕ
@@ -399,6 +418,7 @@ structure Point3' where
 
 def pt3 : Point3 := ⟨⟨0, 1⟩, 2⟩
 def pt3' : Point3 := { x := 0, y := 1, z := 2 }
+def pt3'' : Point3 := { toPoint := ⟨0, 1⟩, z := 2 }
 
 #check pt3.toPoint.x
 
@@ -416,7 +436,7 @@ example : CheckerPoint where
 #print And
 #print Subtype
 
-example : {n // n > 3} := ⟨5, by decide⟩
+example : {n : ℕ // n > 3} := ⟨5, by decide⟩
 example (a : {n // n > 3}) : a.val ≠ 0 := by linarith [a.property]
 
 -- # Typeclasses
@@ -435,6 +455,7 @@ def originX : [_o : Origin] → ℕ
 def myOrigin : Origin := { x := 0, y := 0 }
 
 #check Point.x
+#check originX
 
 -- example : ℕ := originX myOrigin
 example : ℕ := @originX myOrigin
@@ -443,6 +464,7 @@ example : ℕ := @Point.x pt
 -- example : ℕ := @originX _
 -- example : ℕ := @Point.x _
 
+example [_o : Origin] : ℕ := originX
 example [_o : Origin] : ℕ := @originX _
 -- example (_pt : Point) : ℕ := @Point.x _
 
@@ -458,8 +480,7 @@ attribute [class] IsEven
 attribute [instance] IsEven.zero
 instance IsEven.add2' (n : ℕ) [h : IsEven n] : IsEven (n + 2) := IsEven.add2 n h
 
-example : IsEven 42 := inferInstance
-
+def T : IsEven 42 := inferInstance
 
 -- ### using instances for algebraic laws
 

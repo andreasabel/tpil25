@@ -72,20 +72,21 @@ example (p : ℕ → Prop) (h : ∃ a b c : ℕ, p a ∧ p b ∧ p c) : True := 
             trivial
 
 example (p : ℕ → Prop) (h : ∃ a b c : ℕ, p a ∧ p b ∧ p c) : True := by
-  rcases h with ⟨a, b, c, ha, hb, hc⟩
+  rcases h with ⟨a, ⟨b, c, ha, hb, hc⟩⟩
   trivial
 
-example (p : ℕ → Prop) (h : ∃ a b c : ℕ, p a ∧ p b ∧ p c) : True := by
-  obtain ⟨a, b, c, ha, hb, hc⟩ := h
+example (p : ℕ → Prop) (h : ∃ a b c : ℕ, (p a ∧ p b) ∧ p c) : True := by
+  obtain ⟨a, b, c, ⟨-, _⟩, hc⟩ := h
+  -- have : p a := by assumption
   trivial
 
 example (p : ℕ → Prop) (h : ∃ a b c : ℕ, p a ∧ p b ∧ p c) : True := by
   have ⟨a, b, c, ha, hb, hc⟩ := h
   trivial
 
-example (p : ℕ → Prop) (h : ∃ a b c : ℕ, p a ∧ p b ∧ p c) : True := by
+example (p : ℕ → Prop) (h : ∃ a b c : ℕ, (p a ∧ p b) ∧ p c) : True := by
   match h with
-  | ⟨a, b, c, ha, hb, hc⟩ =>
+  | ⟨a, b, c, ⟨ha, hb⟩, hc⟩ =>
     trivial
 
 example (p : ℕ → Prop) (h : ∃ a b c : ℕ, p a ∨ p b ∨ p c) : True := by
@@ -101,7 +102,8 @@ example (p : ℕ → Prop) (h : ∃ a b c : ℕ, p a ∨ p b ∨ p c) : True := 
   | ⟨a, b, c, .inr (.inr ha)⟩ => trivial
 
 example (p : ℕ → Prop) : (∃ a b c : ℕ, p a ∨ p b ∨ p c) → True := by
-  rintro ⟨a, b, c, ha | hb | hc⟩
+  intro h
+  rcases h with ⟨a, b, c, ha | hb | hc⟩
   · trivial
   · trivial
   · trivial
@@ -126,19 +128,6 @@ example (n : ℕ) : (∃ k, n = 2 * k) → IsEven n := by
     apply ih
 
 end «recall our previous proof of IsEven»
-
-example (n : ℕ) : (∃ k, n = 2 * k) → IsEven n := by
-  intro ⟨k, eq⟩
-  rw [eq]
-  clear eq
-  induction k with
-  | zero =>
-    show IsEven 0
-    constructor
-  | succ k ih =>
-    rw [show 2*(k+1) = 2*k + 2 by ring]
-    constructor
-    exact ih
 
 example (n : ℕ) : (∃ k, n = 2 * k) → IsEven n := by
   rintro ⟨k, rfl⟩
@@ -197,13 +186,15 @@ example (n : ℕ) : (∃ k, n = 2 * k) → IsEven n := by
 --   connectives, and properties of relations:
 #check And.intro
 #check And.elim
-#check Or.intro_left
+#check Or.intro_left -- Or.inl
 #check Or.intro_right
 #check Or.elim
 
 #check Eq.refl
 #check Eq.symm
 #check Eq.trans
+
+#check Equiv.refl
 
 -- * Note however we do not do this for axiomatic logical and arithmetic operations.
 #check and_assoc
@@ -218,6 +209,9 @@ example (n : ℕ) : (∃ k, n = 2 * k) → IsEven n := by
 #check Nat.mul_one
 #check sub_add_eq_add_sub
 #check Nat.le_iff_lt_or_eq
+
+#check le_iff_lt_or_eq
+#check le_iff_eq_or_lt
 
 -- * If only a prefix of the description is enough to convey the meaning,
 --   the name may be made even shorter:
@@ -286,21 +280,23 @@ example (a b : ℤ) : a + b - b = a := by exact?
 --   example (a b : ℕ) : a - b + b = a := by exact?
 example (a b : ℕ) : a - b + b = a := by apply?
 
+example (a b c : ℕ) (h : b ≤ a) : a - b + b = a + c - c := by simp [h]
+
 -- ## 4. `#loogle`
 -- * https://loogle.lean-lang.org
 
 -- There is also an older version of loogle called `#find`
-#find _ + _ = _ + _
-#find Nat → Nat
-#find List String → String
+-- #find _ + _ = _ + _
+-- #find Nat → Nat
+-- #find List String → String
 
 
 #loogle "add", _ - _
 
 #loogle Real.sin -- theorems using `Real.sin`
 #loogle "differ" -- theorems whose names contain `differ`
--- #loogle _ * (_ ^ _) -- theorems with a subexpression
--- s#loogle ?a * ?b = ?b * ?a -- nonlinear patterns
+#loogle _ * (_ ^ _) -- theorems with a subexpression
+#loogle ?a * ?b = ?b * ?a -- nonlinear patterns
 #loogle ⊢ tsum _ = _ * tsum _ -- search only in the conclusion
 
 -- ## 5. `#moogle`
@@ -320,12 +316,94 @@ example (a b : ℕ) : a - b + b = a := by apply?
 
 -- # Formalization demo: STLC is strongly normalizing
 
+namespace STLC
+
 inductive Typ
   | nat : Typ
   | fn : Typ → Typ → Typ
 
 inductive Term
   | nat : Nat → Term
-  | var : Term
+  | var : Nat → Term
   | app : Term → Term → Term
   | lam : Typ → Term → Term
+
+set_option hygiene false in
+set_option quotPrecheck false in
+notation:29 Γ:30 " ⊢ " e:30 " : " α:30 => HasType Γ e α
+
+inductive HasType : List Typ → Term → Typ → Prop
+  | nat {Γ n} : Γ ⊢ (.nat n) : .nat
+  | var {Γ n α} : Γ[n]? = some α → Γ ⊢ (.var n) : α
+  | app {Γ α β f x} : Γ ⊢ f : .fn α β → Γ ⊢ x : α → Γ ⊢ .app f x : β
+  | lam {Γ α β e} : α::Γ ⊢ e : β → Γ ⊢ .lam α e : .fn α β
+
+namespace Term
+
+-- A |- x
+-- A x1:B C |- e
+-- A C |- e[x/x1]
+--   ^
+
+
+-- A x1:B C |- e
+-- A C |- lift x
+-- A |- x
+
+
+def liftN : Term → Nat → Nat → Term
+  | .nat n, _, _ => .nat n
+  | .var n, m, k => if n < k then .var n else .var (n + m)
+  | .app f a, m, k => .app (f.liftN m k) (a.liftN m k)
+  | .lam α a, m, k => .lam α (a.liftN m (k + 1))
+
+def lift (e : Term) : Term := liftN e 1 0
+
+def substN : Term → Term → Nat → Term
+  | .nat n, _, _ => .nat n
+  | .var n, x, k =>
+    if n < k then .var n else
+    if n = k then x.liftN k 0 else .var (n - 1)
+  | .app f a, x, k => .app (f.substN x k) (a.substN x k)
+  | .lam α a, x, k => .lam α (a.substN x (k + 1))
+
+def subst (e x : Term) : Term := substN e x 0
+
+end Term
+
+inductive Reduct : Term → Term → Prop
+  | app_l {f f' x} : Reduct f f' → Reduct (.app f x) (.app f' x)
+  | app_r {f x x'} : Reduct x x' → Reduct (.app f x) (.app f x')
+  | lam {α e e'} : Reduct e e' → Reduct (.lam α e) (.lam α e')
+  | beta {α e x} : Reduct (.app (.lam α e) x) (e.subst x)
+
+inductive Normal : Term → Prop
+  | nat {n} : Normal (.nat n)
+  | lam {α n} : Normal (.lam α n)
+
+inductive Neutral : Term → Prop
+  | nat {n} : Neutral (.nat n)
+  | var {n} : Neutral (.var n)
+  | app {a b} : Neutral (.app a b)
+
+inductive SN : Term → Prop
+  | intro {x} : (∀ y, Reduct x y → SN y) → SN x
+
+def SC : Typ → Term → Prop
+  | .nat, t => SN t
+  | .fn α β, t => ∀ x, SC α x → SC β (.app t x)
+
+theorem SC.toSN (α) (t : Term) (h : SC α t) : SN t := by
+  induction α generalizing t with
+  | nat => exact h
+  | fn α β ihα ihβ =>
+    simp [SC] at h
+    sorry
+
+theorem SC.reduct {α} {t t' : Term}
+    (h : SC α t) (h : Reduct t t') : SC α t' := by
+  sorry
+
+theorem SC.of_neutral {α} {t t' : Term}
+    (h : Neutral t) (h : ∀ t', Reduct t t' → SC α t') : SC α t := by
+  sorry

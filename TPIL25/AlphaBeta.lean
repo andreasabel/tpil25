@@ -53,6 +53,17 @@ instance DecidablePlayerLe (turn : Player) : DecidableRel (Player.le (Value := V
     | Player.Min => _
 
 
+def Player.le_refl (turn : Player) : Reflexive (turn.le (Value := Value)) := by
+  intro x
+  cases turn
+  case Max =>
+    exact order.le_refl x
+    done
+  case Min =>
+    exact order.le_refl x
+    done
+  done
+
 -- Maximize the value of the position for `Max` and minimize it for `Min`.
 
 def Player.max (turn : Player) : (a b : Value) -> Value :=
@@ -206,13 +217,13 @@ mutual
     (interval' : Interval (Value := Value))
     (sub : Interval.subset interval interval')
     (root : Position) :
-    player.alphabeta (depth := depth) (interval := interval)  (root := root) ≤
-    player.alphabeta (depth := depth) (interval := interval') (root := root)
+    player.le (player.alphabeta (depth := depth) (interval := interval) (root := root))
+              (player.alphabeta (depth := depth) (interval := interval') (root := root))
     := by
     cases depth -- generalizing interval interval' root
     case zero =>
       unfold Player.alphabeta
-      exact le_refl _
+      apply player.le_refl
       done
     case succ depth =>
       unfold Player.alphabeta
@@ -226,29 +237,37 @@ mutual
     (sub : Interval.subset interval interval')
     (value : Value)
     (nodes : List Position) :
-    player.alphabetas (depth := depth) (interval := interval)  (value := value) (nodes := nodes) ≤
-    player.alphabetas (depth := depth) (interval := interval') (value := value) (nodes := nodes)
+    player.le (player.alphabetas (depth := depth) (interval := interval) (value := value) (nodes := nodes))
+              (player.alphabetas (depth := depth) (interval := interval') (value := value) (nodes := nodes))
     := by
     cases nodes
     case nil =>
       unfold Player.alphabetas
-      exact le_refl _
+      apply player.le_refl
       done
     case cons node nodes =>
       unfold Player.alphabetas
       let value1  := player.other.alphabeta depth interval node
       let value1' := player.other.alphabeta depth interval' node
-      have ih1 : value1 ≤ value1' := relax_alphabeta player.other depth interval interval' sub node
+      have ih1 : player.other.le value1 value1' := relax_alphabeta player.other depth interval interval' sub node
       -- let h := player.le value1 value
 
-      if h' : player.le value1' value then
-        have h : player.le value1 value := by
-          
+      if h : player.le value1 value then
+        have h' : player.le value1' value := by
+          sorry
           done
         simp [*]
         exact relax_alphabetas player depth interval interval' sub value nodes
         done
-      else if player.beyond interval value1 then
+      else
+        -- here I have value ≤ value1 and value1' ≤ value1
+        -- which does not tell me how value1' compares to value
+        -- so I do not know how to simplify the `if`.
+        if b' : player.beyond interval' value1' then
+        have b : player.beyond interval value1 := by
+          sorry
+          done
+        simp [*]
         exact relax_alphabetas player depth interval interval' sub value node nodes
         done
       else

@@ -143,6 +143,7 @@ def MyList.map {α β} (f : α → β) : MyList α → MyList β
 #eval (.cons 1 (.cons 4 (.cons 0 .nil)) : MyList ℕ)
 #eval (.cons 1 (.cons 4 (.cons 0 .nil)) : MyList ℕ)
         |>.map fun n => n * 10
+        -- |> MyList.map fun n => n * 10
 
 
 -- ## What does an `inductive` declaration actually do?
@@ -277,8 +278,9 @@ def firstOpt {α} (a b : Option α) : Option α :=
 
 def firstOpt' {α} (a b : Option α) : Option α :=
   match a, b with
-  | some x, _ | _, some x => some x
-  | none, none => none
+  | some x, _
+  | _, some x => some x
+  | _, _ => none
 
 def firstOpt'' {α} : (a b : Option α) → Option α :=
   fun
@@ -289,6 +291,15 @@ def firstOpt''' {α} : (a b : Option α) → Option α := by
   intro
   | some x, _ | _, some x => exact some x
   | none, none => exact none
+
+theorem firstOpt_some1 {α} (a : α) (s : Option α) :
+  firstOpt (some a) s = some a := by
+    simp [firstOpt]
+
+theorem firstOpt_some2 {α} (s : Option _) (b : α) :
+  firstOpt s (some b) = some b := by
+    simp [firstOpt]
+    done
 
 -- ## Inductive propositions
 
@@ -314,7 +325,7 @@ theorem MyNonempty.exists {α} : MyNonempty α → ∃ x : α, x = x
 
 set_option pp.proofs true
 example (get : MyNonempty ℕ → ℕ)
-    (hget : ∀ (a : ℕ), get (MyNonempty.mk a) = a)
+    (hget : ∀ (n : ℕ), get (MyNonempty.mk n) = n)
     : False := by
   let a := MyNonempty.mk 0
   let b := MyNonempty.mk 1
@@ -323,6 +334,7 @@ example (get : MyNonempty ℕ → ℕ)
   have H1 : get b = 1 := hget 1
   have : 0 = 1 := by rw [← H0, H1]
   cases this
+  done
 
 #check Classical.choice
 
@@ -347,7 +359,7 @@ example (n : ℕ) : IsEven n ↔ ∃ k, n = 2 * k := by
       ring
   · intro ⟨k, eq⟩
     rw [eq]
-    clear eq
+    clear eq -- needed to get the correct induction hypothesis
     induction k with
     | zero =>
       show IsEven 0

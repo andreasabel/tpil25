@@ -1,5 +1,8 @@
 -- Prove correctness of alpha-beta pruning in the minimax alpha-beta algorithm.
 
+import Mathlib.Tactic.Basic
+import Mathlib.Tactic.LiftLets
+
 import Mathlib.Order.Defs.LinearOrder
 import Mathlib.Order.BoundedOrder.Basic
 
@@ -47,22 +50,18 @@ def Player.ge (turn : Player) : Value → Value → Prop :=
     | Player.Max => flip order.le
     | Player.Min => order.le
 
+#print flip
 instance DecidablePlayerLe (turn : Player) : DecidableRel (Player.le (Value := Value) turn) :=
   match turn with
     | Player.Max => order.decidableLE
-    | Player.Min => _
+    -- -- | Player.Min => flip order.decidableLE -- error
+    | Player.Min => fun a b => order.decidableLE b a
 
 
-def Player.le_refl (turn : Player) : Reflexive (turn.le (Value := Value)) := by
-  intro x
-  cases turn
-  case Max =>
-    exact order.le_refl x
-    done
-  case Min =>
-    exact order.le_refl x
-    done
-  done
+def Player.le_refl : (turn : Player) -> Reflexive (turn.le (Value := Value))
+  | Player.Max => order.le_refl
+  | Player.Min => order.le_refl
+
 
 -- Maximize the value of the position for `Max` and minimize it for `Min`.
 
@@ -247,8 +246,10 @@ mutual
       done
     case cons node nodes =>
       unfold Player.alphabetas
-      let value1  := player.other.alphabeta depth interval node
-      let value1' := player.other.alphabeta depth interval' node
+      lift_lets
+      intro value1 value1'
+      -- let value1  := player.other.alphabeta depth interval node
+      -- let value1' := player.other.alphabeta depth interval' node
       have ih1 : player.other.le value1 value1' := relax_alphabeta player.other depth interval interval' sub node
       -- let h := player.le value1 value
 
@@ -275,29 +276,29 @@ mutual
         done
       done
 
-      cases player.le value1 value with
-      | true =>
-        apply relax_alphabetas
-        exact sub
-        done
-      match (player.le value1 value) with
-      | true =>
-        apply relax_alphabetas
-        exact sub
-        done
+    --   cases player.le value1 value with
+    --   | true =>
+    --     apply relax_alphabetas
+    --     exact sub
+    --     done
+    --   match (player.le value1 value) with
+    --   | true =>
+    --     apply relax_alphabetas
+    --     exact sub
+    --     done
 
-      cases player with
-      | Max =>
-        unfold Player.alphabetas
-        apply relax_alphabetas
-        exact sub
-        done
-      | Min =>
-        unfold Player.alphabetas
-        exact relax_alphabetas Player.Min depth interval interval' sub value node nodes
-        done
-      done
-    done
+    --   cases player with
+    --   | Max =>
+    --     unfold Player.alphabetas
+    --     apply relax_alphabetas
+    --     exact sub
+    --     done
+    --   | Min =>
+    --     unfold Player.alphabetas
+    --     exact relax_alphabetas Player.Min depth interval interval' sub value node nodes
+    --     done
+    --   done
+    -- done
 
 end
 

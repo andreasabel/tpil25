@@ -315,62 +315,26 @@ mutual
     -- Otherwise, if the minimax value is inside the interval,
     -- the alpha-beta value is the same as the minimax value.
     else vab = vmm :=
-    
     by
       match depth with
-      | 0 =>
-        unfold Player.alphabeta
-        unfold Player.minimax
-        unfold Player.search
-        simp [*]
-        done
+      | 0 => simp [Player.alphabeta, Player.minimax, Player.search, *]
+
       | depth + 1 =>
         let nodes := tree.children root
-        unfold Player.alphabeta
-        unfold Player.minimax
-        unfold Player.search
+        unfold Player.alphabeta Player.minimax Player.search
         intro vab vmm
+        have ih := player.alphabetas_correctness depth interval player.bot nodes
+        split_ifs with h1 h2 -- <;> simp [*] at ih <;> exact ih
 
-        split
-        case isTrue => -- player.le vmm interval.alpha =>
-          have ih := player.alphabetas_correctness depth interval player.bot nodes
-          unfold Player.alphabetas at ih
-          unfold Player.minimaxs at ih
-          simp [*] at ih
+        next => -- Case: player.le vmm interval.alpha
+          simp [Player.alphabetas, Player.minimaxs, h1] at ih
           exact ih
-          done
-        case isFalse =>
-          split
-          case isTrue =>
-            have ih := player.alphabetas_correctness depth interval player.bot nodes
-            unfold Player.alphabetas at ih
-            unfold Player.minimaxs at ih
-            simp [*] at ih
-            exact ih
-            done
-          case isFalse =>
-            have ih := player.alphabetas_correctness depth interval player.bot nodes
-            unfold Player.alphabetas at ih
-            unfold Player.minimaxs at ih
-            simp [*] at ih
-            exact ih
-            done
-          done
-
-
-
-        done
-        split
-
-        lift_lets
-
-        cases
-        unfold Player.alphabeta
-        unfold Player.minimax
-        simp [0]
-        done
-
-
+        next =>
+          simp [Player.alphabetas, Player.minimaxs, h1, h2] at ih
+          exact ih
+        next =>
+          simp [Player.alphabetas, Player.minimaxs, h1, h2] at ih
+          exact ih
 
   theorem Player.alphabetas_correctness (player: Player) (depth : Nat)
     (interval : Interval (Value := Value)) (value : Value) (nodes : List Position) :
@@ -385,9 +349,46 @@ mutual
       player.le interval.beta vab
     -- Otherwise, if the minimax value is inside the interval,
     -- the alpha-beta value is the same as the minimax value.
-    else
-      vab = vmm := by
-      sorry
+    else vab = vmm :=
+    by
+      match nodes with
+      | [] => simp [Player.alphabetas, Player.minimaxs, Player.searchs, *]
+      | node :: nodes =>
+        unfold Player.alphabetas Player.minimaxs Player.searchs
+
+        lift_lets
+        intro v1 vab v2 vmm
+        if h : player.le v1 value then
+
+          simp [*] at vab -- TODO how to simplify a let-rhs
+
+          have ih := player.alphabetas_correctness depth interval v1 nodes
+          simp [Player.alphabetas, Player.minimaxs, Player.searchs, *] at ih
+          exact ih
+        else
+          if b : player.beyond interval v1 then
+            simp [Player.alphabetas, Player.minimaxs, Player.searchs, *]
+          else
+            let v2 := player.other.alphabeta depth interval node
+            let interval' := player.update v2 interval
+            have ih := player.alphabetas_correctness depth interval' v2 nodes
+            simp [Player.alphabetas, Player.minimaxs, Player.searchs, *] at ih
+            exact ih
+
+
+        intro value1 vab value2 vmm
+        split_ifs with h1 h2
+        next =>
+          split_ifs at vab with i1 i2
+          have ih := player.alphabetas_correctness depth interval value nodes
+          simp [Player.alphabetas, Player.minimaxs, Player.searchs, *] at ih
+          exact ih
+
+
+
+
+
+
 
 end
 

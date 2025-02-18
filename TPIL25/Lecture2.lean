@@ -38,7 +38,7 @@ theorem bar' : True := trivial
 -- # Hole filling
 
 example : (True → True) ∧ (False → True) :=
-  ⟨fun h : True => h, fun _ => trivial⟩
+  ⟨ fun _ => trivial, nofun ⟩
 
 example : (True → True) ∧ (False → True) :=
   ⟨fun h => h, fun _h => trivial⟩
@@ -223,6 +223,11 @@ example (α : Type) (p q : α → Prop) : (∃ x, p x ∨ q x) → ∃ x, q x �
   | ⟨w, Or.inl h⟩ => exact ⟨w, Or.inr h⟩
   | ⟨w, Or.inr h⟩ => exact ⟨w, Or.inl h⟩
 
+example (α : Type) (p q : α → Prop) : (∃ x, p x ∨ q x) → ∃ x, q x ∨ p x :=
+  fun
+  | ⟨w, Or.inl h⟩ => ⟨w, Or.inr h⟩
+  | ⟨w, Or.inr h⟩ => ⟨w, Or.inl h⟩
+
 -- # show
 example (n : Nat) : n + 1 = Nat.succ n := by
   show Nat.succ n = Nat.succ n
@@ -361,7 +366,7 @@ example (x y z : Nat) : (x + 0) * (0 + y * 1 + z * 0) = x * y := by
 open List
 example (xs : List Nat)
         : reverse (xs ++ [1, 2, 3]) = [3, 2, 1] ++ reverse xs := by
-  simp
+  simp?
 
 example {α} (xs ys : List α)
         : length (reverse (xs ++ ys)) = length xs + length ys := by
@@ -455,7 +460,7 @@ end
 variable (a b c d e : ℝ)
 
 example : c * b * a = b * (a * c) := by
-  ring
+  show_term ring
 
 example : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := by
   ring

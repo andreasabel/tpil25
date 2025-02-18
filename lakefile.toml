@@ -15,3 +15,7 @@ rev = "v4.15.0"
 [[lean_lib]]
 name = "TPIL25"
 globs = ["TPIL25.+"]
+
+[[lean_exe]]
+name = "lec5"
+root = "TPIL25.Lecture5"

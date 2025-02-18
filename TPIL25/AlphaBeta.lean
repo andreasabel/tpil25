@@ -292,31 +292,102 @@ theorem Player.search_minimaxs (player : Player) (depth : Nat) (interval : Inter
 def Player.alphabeta (player : Player) (depth : Nat) (interval : Interval (Value := Value))
     (root : Position) : Value :=
     player.search true depth interval root
+
 def Player.alphabetas (player : Player) (depth : Nat) (interval : Interval (Value := Value))
     (value : Value) (nodes : List Position) : Value :=
     player.searchs true depth interval value nodes
 
+-- Correctness of alpha-beta pruning.
+
 mutual
 
-  def Player.alphabeta (player : Player) (depth : Nat) (interval : Interval (Value := Value))
-    (root : Position) : Value :=
-    match depth with
-      | 0 => tree.rating root
-      | depth + 1 => player.alphabetas depth interval player.bot $ tree.children root
+  theorem Player.alphabeta_correctness (player: Player) (depth : Nat)
+    (interval : Interval (Value := Value)) (root : Position) :
 
-  -- Assume that `value` is not beyond the interval.
-  def Player.alphabetas (player : Player) (depth : Nat) (interval : Interval (Value := Value))
-    (value : Value) (nodes : List Position) : Value :=
-    match nodes with
-      | [] => value
-      | node :: nodes =>
-        let value1 := player.other.alphabeta depth interval node
-        if player.le value1 value then
-          player.alphabetas depth interval value nodes
-        else if player.beyond interval value1 then
-          value1
-        else
-          player.alphabetas depth (player.update value1 interval) value1 nodes
+    let vab := player.alphabeta depth interval root
+    let vmm := player.minimax depth root
+    -- If the minimax value is on one side of the interval,
+    -- the alpha-beta value is on the same side.
+    if player.le vmm interval.alpha then
+      player.le vab interval.alpha
+    else if player.le interval.beta vmm then
+      player.le interval.beta vab
+    -- Otherwise, if the minimax value is inside the interval,
+    -- the alpha-beta value is the same as the minimax value.
+    else vab = vmm :=
+    
+    by
+      match depth with
+      | 0 =>
+        unfold Player.alphabeta
+        unfold Player.minimax
+        unfold Player.search
+        simp [*]
+        done
+      | depth + 1 =>
+        let nodes := tree.children root
+        unfold Player.alphabeta
+        unfold Player.minimax
+        unfold Player.search
+        intro vab vmm
+
+        split
+        case isTrue => -- player.le vmm interval.alpha =>
+          have ih := player.alphabetas_correctness depth interval player.bot nodes
+          unfold Player.alphabetas at ih
+          unfold Player.minimaxs at ih
+          simp [*] at ih
+          exact ih
+          done
+        case isFalse =>
+          split
+          case isTrue =>
+            have ih := player.alphabetas_correctness depth interval player.bot nodes
+            unfold Player.alphabetas at ih
+            unfold Player.minimaxs at ih
+            simp [*] at ih
+            exact ih
+            done
+          case isFalse =>
+            have ih := player.alphabetas_correctness depth interval player.bot nodes
+            unfold Player.alphabetas at ih
+            unfold Player.minimaxs at ih
+            simp [*] at ih
+            exact ih
+            done
+          done
+
+
+
+        done
+        split
+
+        lift_lets
+
+        cases
+        unfold Player.alphabeta
+        unfold Player.minimax
+        simp [0]
+        done
+
+
+
+  theorem Player.alphabetas_correctness (player: Player) (depth : Nat)
+    (interval : Interval (Value := Value)) (value : Value) (nodes : List Position) :
+
+    let vab := player.alphabetas depth interval value nodes
+    let vmm := player.minimaxs depth value nodes
+    -- If the minimax value is on one side of the interval,
+    -- the alpha-beta value is on the same side.
+    if player.le vmm interval.alpha then
+      player.le vab interval.alpha
+    else if player.le interval.beta vmm then
+      player.le interval.beta vab
+    -- Otherwise, if the minimax value is inside the interval,
+    -- the alpha-beta value is the same as the minimax value.
+    else
+      vab = vmm := by
+      sorry
 
 end
 

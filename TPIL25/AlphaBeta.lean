@@ -62,6 +62,19 @@ def Player.le_refl : (turn : Player) -> Reflexive (turn.le (Value := Value))
   | Player.Max => order.le_refl
   | Player.Min => order.le_refl
 
+def Player.le_trans : (turn : Player) -> Transitive (turn.le (Value := Value))
+  | Player.Max => order.le_trans
+  | Player.Min => fun a b c h1 h2 => order.le_trans c b a h2 h1
+
+def Player.le_other (turn : Player) (a b : Value) : turn.other.le a b → turn.le b a :=
+  match turn with
+    | Player.Max => id
+    | Player.Min => id
+
+def Player.other_le (turn : Player) (a b : Value) : turn.le a b → turn.other.le b a :=
+  match turn with
+    | Player.Max => id
+    | Player.Min => id
 
 -- Maximize the value of the position for `Max` and minimize it for `Min`.
 
@@ -97,12 +110,12 @@ def Player.maximum1 (turn : Player) (base : Value) : List Value → Value :=
 --             value := min(value, minimax(child, depth − 1, TRUE))
 --         return value
 
-def Player.minimax (player : Player) (depth : Nat) (root : Position) : Value :=
+def Player.minimax_spec (player : Player) (depth : Nat) (root : Position) : Value :=
   match depth with
     | 0 => tree.rating root
     | depth + 1 =>
         player.maximum1 (tree.rating root) $
-          List.map (player.other.minimax depth) $ tree.children root
+          List.map (player.other.minimax_spec depth) $ tree.children root
 
 -- Intervals of values for alpha-beta pruning.
 
@@ -184,6 +197,105 @@ mutual
 
 end
 
+-- Generic version with switchable pruning.
+
+mutual
+
+  def Player.search (prune : Bool) (player : Player) (depth : Nat) (interval : Interval (Value := Value))
+    (root : Position) : Value :=
+    match depth with
+      | 0 => tree.rating root
+      | depth + 1 => player.searchs prune depth interval player.bot $ tree.children root
+
+  -- Assume that `value` is not beyond the interval.
+  def Player.searchs (prune : Bool) (player : Player) (depth : Nat) (interval : Interval (Value := Value))
+    (value : Value) (nodes : List Position) : Value :=
+    match nodes with
+      | [] => value
+      | node :: nodes =>
+        let value1 := player.other.search prune depth interval node
+        if player.le value1 value then
+          player.searchs prune depth interval value nodes
+        else if prune && player.beyond interval value1 then
+          value1
+        else
+          player.searchs prune depth (player.update value1 interval) value1 nodes
+
+end
+
+-- Theorem: If pruning is disabled, the interval does not matter.
+
+mutual
+  theorem Player.search_no_prune (player : Player) (depth : Nat) (interval1 interval2 : Interval (Value := Value)) (root : Position) :
+    player.search false depth interval1 root = player.search false depth interval2 root :=
+    match depth with
+      | 0 => by
+          unfold Player.search
+          rfl
+      | depth + 1 => by
+          unfold Player.search
+          apply player.searchs_no_prune depth interval1 interval2 player.bot (tree.children root)
+
+  theorem Player.searchs_no_prune (player : Player) (depth : Nat)
+    (interval1 interval2 : Interval (Value := Value)) (value : Value) (nodes : List Position) :
+    player.searchs false depth interval1 value nodes =
+    player.searchs false depth interval2 value nodes :=
+    match nodes with
+      | [] => by
+          unfold Player.searchs
+          rfl
+      | node :: nodes => by
+          unfold Player.searchs
+          lift_lets
+          intro value1 value1'
+          have ih1: value1 = value1' := by
+            apply player.other.search_no_prune
+          simp [*]
+          if h : player.le value1' value then
+            simp [*]
+            exact player.searchs_no_prune depth interval1 interval2 value nodes
+          else
+            simp [*]
+            apply player.searchs_no_prune depth _ _ value1' nodes
+end
+
+
+-- Minimax.
+
+def Player.minimax (player : Player) (depth : Nat)
+    (root : Position) : Value :=
+    player.search false depth Interval.full root
+
+def Player.minimaxs (player : Player) (depth : Nat)
+    (value : Value) (nodes : List Position) : Value :=
+    player.searchs false depth Interval.full value nodes
+
+-- Theorem: If pruning is disabled, `search` is equivalent to `minimax`.
+
+theorem Player.search_minimax (player : Player) (depth : Nat) (interval : Interval (Value := Value)) (root : Position) :
+    player.search false depth interval root = player.minimax depth root := by
+    unfold minimax
+    apply player.search_no_prune
+
+-- Theorem: If pruning is disabled, `searchs` is equivalent to `minimaxs`.
+
+theorem Player.search_minimaxs (player : Player) (depth : Nat) (interval : Interval (Value := Value)) (value : Value) (nodes : List Position) :
+    player.searchs false depth interval value nodes = player.minimaxs depth value nodes := by
+    unfold minimaxs
+    apply player.searchs_no_prune
+
+
+-- Alpha-beta pruning.
+
+-- def Player.alphabeta := Player.search true -- type class problem
+
+def Player.alphabeta (player : Player) (depth : Nat) (interval : Interval (Value := Value))
+    (root : Position) : Value :=
+    player.search true depth interval root
+def Player.alphabetas (player : Player) (depth : Nat) (interval : Interval (Value := Value))
+    (value : Value) (nodes : List Position) : Value :=
+    player.searchs true depth interval value nodes
+
 mutual
 
   def Player.alphabeta (player : Player) (depth : Nat) (interval : Interval (Value := Value))
@@ -212,8 +324,7 @@ end
 
 mutual
   lemma relax_alphabeta (player : Player) (depth : Nat)
-    (interval  : Interval (Value := Value))
-    (interval' : Interval (Value := Value))
+    (interval interval' : Interval (Value := Value))
     (sub : Interval.subset interval interval')
     (root : Position) :
     player.le (player.alphabeta (depth := depth) (interval := interval) (root := root))
@@ -231,8 +342,7 @@ mutual
       done
 
   lemma relax_alphabetas (player : Player) (depth : Nat)
-    (interval  : Interval (Value := Value))
-    (interval' : Interval (Value := Value))
+    (interval  interval' : Interval (Value := Value))
     (sub : Interval.subset interval interval')
     (value : Value)
     (nodes : List Position) :
